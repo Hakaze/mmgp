@@ -177,7 +177,13 @@ def convert_scaled_fp8_to_quanto(
     in_place: bool = False,
     free_cuda_cache: bool = False,
     cuda_cache_interval: int = 32,
+    # quant_router compatibility
+    verboseLevel: int = 1,
+    detection: Optional[Dict] = None,
+    default_dtype: Optional[Union[str, torch.dtype]] = None,
 ) -> ConvertResult:
+    if default_dtype is not None:
+        dtype = default_dtype
     sd_scale_dtype = _normalize_scale_dtype(dtype)
     patch_needed = (sd_scale_dtype == torch.float32)
 
@@ -285,6 +291,7 @@ def detect_safetensors_format(
     sd_metadata: Optional[Dict[str, str]] = None,
     probe_weights: bool = False,   # if True, we may read up to 2 weights total
     with_hints: bool = False,
+    verboseLevel: int = 1,
 ) -> Dict[str, str]:
     """
     Returns:
