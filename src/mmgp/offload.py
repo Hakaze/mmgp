@@ -3366,7 +3366,9 @@ def all(pipe_or_dict_of_modules, pinnedMemory = False, pinnedPEFTLora = False, p
                         else:
                             if model_dtype != dtype:
                                 pass
-                            assert model_dtype == dtype
+                            if model_dtype != dtype:
+                                # assert model_dtype == dtype
+                                pass
                     current_model_size +=  torch.numel(p.data) * p.data.element_size()
                 current_model._dtype = model_dtype
         for b in current_model.buffers():
