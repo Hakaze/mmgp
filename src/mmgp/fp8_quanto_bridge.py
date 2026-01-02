@@ -51,7 +51,9 @@ class FileAccessor(Accessor):
     def has(self, key: str) -> bool: return key in self._keys_set
     def get_tensor(self, key: str) -> torch.Tensor: return self._fh.get_tensor(key)
     def metadata(self) -> Dict[str, str]: return self._meta
-    def close(self) -> None: self._fh.close()
+    def close(self) -> None: 
+        if hasattr(self._fh, "close"):
+            self._fh.close()
 
 class DictAccessor(Accessor):
     def __init__(self, sd: Dict[str, torch.Tensor], meta: Optional[Dict[str, str]] = None,
@@ -211,6 +213,11 @@ def convert_scaled_fp8_to_quanto(
                 wk = base + ".weight"
                 if wk in keys:
                     scale_weight_map[wk] = sk
+            elif sk.endswith(".weight_scale"):
+                base = sk[:-len(".weight_scale")]
+                wk = base + ".weight"
+                if wk in keys:
+                     scale_weight_map[wk] = sk
 
         def get_scale_vec_for_weight(wk: str, out_ch: int) -> Optional[torch.Tensor]:
             # 1) explicit tensor
@@ -239,7 +246,7 @@ def convert_scaled_fp8_to_quanto(
         # Single pass: rewrite FP8 weights, copy-through others
         for k in keys:
             # Drop source-only artifacts
-            if k == "scaled_fp8" or k.endswith(".scale_weight") :
+            if k == "scaled_fp8" or k.endswith(".scale_weight") or k.endswith(".weight_scale") or k.endswith(".comfy_quant"):
                 continue
 
             t = acc.get_tensor(k)
@@ -301,7 +308,9 @@ def detect_safetensors_format(
         # --- Single pass over keys (no re-scans) ---
         ks = list(acc.keys())
         has_scale_weight = False
+        has_weight_scale = False # ComfyUI style
         saw_quanto_data = False
+        saw_comfy_quant = False
         fp8_variant = None
         fp8_probe_budget = 2 if probe_weights else 1
 
@@ -310,7 +319,10 @@ def detect_safetensors_format(
             if not saw_quanto_data and k.endswith(DATA_SUFFIX):
                 saw_quanto_data = True
                 # we can break here, but keep minimal state setting uniformity
-                break
+                # break 
+            
+            if k == ".comfy_quant" or k.endswith(".comfy_quant"):
+                 saw_comfy_quant = True
 
         if saw_quanto_data:
             out = {"kind": "quanto", "quant_format": "qfloat8", "fp8_format": ""}
@@ -321,7 +333,9 @@ def detect_safetensors_format(
         for k in ks:
             if not has_scale_weight and k.endswith(".scale_weight"):
                 has_scale_weight = True
-                # don't return yet; we may still probe a dtype to grab variant
+            
+            if not has_weight_scale and k.endswith(".weight_scale"):
+                has_weight_scale = True
 
             if fp8_probe_budget > 0 and _is_weight_key(k):
                 dt = acc.get_tensor(k).dtype
@@ -334,6 +348,11 @@ def detect_safetensors_format(
             out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fp8_variant or "unknown"}
             if with_hints: out["hint"] = "scale_weight keys"
             return out
+        
+        if has_weight_scale or saw_comfy_quant:
+             out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fp8_variant or "unknown"}
+             if with_hints: out["hint"] = "comfyui keys"
+             return out
 
         if fp8_variant is not None:
             out = {"kind": "fp8", "quant_format": "", "fp8_format": fp8_variant}
