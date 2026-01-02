@@ -308,7 +308,7 @@ def detect_safetensors_format(
         if acc.has("scaled_fp8"):
             dt = acc.get_tensor("scaled_fp8").dtype
             fp8_fmt = "e4m3fn" if dt == torch.float8_e4m3fn else ("e5m2" if dt == torch.float8_e5m2 else "unknown")
-            out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fp8_fmt}
+            out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fp8_fmt, "matched": True}
             if with_hints: out["hint"] = "sentinel"
             return out
 
@@ -332,7 +332,7 @@ def detect_safetensors_format(
                  saw_comfy_quant = True
 
         if saw_quanto_data:
-            out = {"kind": "quanto", "quant_format": "qfloat8", "fp8_format": ""}
+            out = {"kind": "quanto", "quant_format": "qfloat8", "fp8_format": "", "matched": True}
             if with_hints: out["hint"] = "keys:*._data"
             return out
 
@@ -352,17 +352,17 @@ def detect_safetensors_format(
                     fp8_variant = "e5m2";   fp8_probe_budget -= 1
 
         if has_scale_weight:
-            out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fp8_variant or "unknown"}
+            out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fp8_variant or "unknown", "matched": True}
             if with_hints: out["hint"] = "scale_weight keys"
             return out
         
         if has_weight_scale or saw_comfy_quant:
-             out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fp8_variant or "unknown"}
+             out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fp8_variant or "unknown", "matched": True}
              if with_hints: out["hint"] = "comfyui keys"
              return out
 
         if fp8_variant is not None:
-            out = {"kind": "fp8", "quant_format": "", "fp8_format": fp8_variant}
+            out = {"kind": "fp8", "quant_format": "", "fp8_format": fp8_variant, "matched": True}
             if with_hints: out["hint"] = "weight dtype (plain fp8)"
             return out
 
@@ -377,7 +377,7 @@ def detect_safetensors_format(
         )
         if has_scale_map:
             fmt = "e4m3fn" if "e4m3" in blob else ("e5m2" if "e5m2" in blob else "unknown")
-            out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fmt}
+            out = {"kind": "scaled_fp8", "quant_format": "", "fp8_format": fmt, "matched": True}
             if with_hints: out["hint"] = "metadata"
             return out
 
@@ -388,7 +388,7 @@ def detect_safetensors_format(
                 qtype_hint = tok
                 break
 
-        out = {"kind": "none", "quant_format": qtype_hint, "fp8_format": ""}
+        out = {"kind": "none", "quant_format": qtype_hint, "fp8_format": "", "matched": False}
         if with_hints: out["hint"] = "no decisive keys"
         return out
 
