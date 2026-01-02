@@ -20,3 +20,6 @@ class profile_type(int, enum.Enum):
     LowRAM_LowVRAM  = 4
     VerylowRAM_LowVRAM  = 5
 
+
+from . import quant_router
+

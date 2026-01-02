@@ -578,3 +578,7 @@ def _cli():
 
 if __name__ == "__main__":
     raise SystemExit(_cli())
+
+# Aliases for quant_router
+detect = detect_safetensors_format
+convert_to_quanto = convert_scaled_fp8_to_quanto
