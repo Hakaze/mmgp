@@ -279,14 +279,19 @@ def convert_scaled_fp8_to_quanto(
                 base = k[:-len(".weight")]
                 qmap[base] = {"weights": _QTYPE_NAME[fmt], "activations": "none"}
             else:
-                 # [Preserve Dtype]
-                 # If it's a floating-point tensor (FP16, BF16, FP32), keep as-is.
-                 # Avoid upcasting FP16 -> BF16 via 'dtype' default unless strictly necessary.
-                 if t.dtype in (torch.float16, torch.bfloat16, torch.float32):
+                 # [Preserve Dtype - Robust]
+                 if not t.is_floating_point():
+                     # Prevent casting integers (metadata, indices) to float
                      out_sd[k] = t
+                     
+                 elif t.dtype == torch.float64:
+                     # Demote double to float to save memory (optional but safe)
+                     out_sd[k] = t.float()
+                     
                  else:
-                     # For non-floats or explicit mismatch, fallback to requested dtype/float32
-                     out_sd[k] =  t if t.dtype == dtype or t.dtype == torch.float32 else t.to(dtype)
+                     # Floats (fp8, fp16, bf16, fp32) -> Keep as-is
+                     # Do not apply 'dtype' (default_dtype) casting here.
+                     out_sd[k] = t
             t = None
         return ConvertResult(state_dict=out_sd, quant_map=qmap, fp8_format=fmt, patch_needed=patch_needed)
     finally:
