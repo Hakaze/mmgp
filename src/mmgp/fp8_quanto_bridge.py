@@ -482,7 +482,6 @@ def detect_safetensors_format(
 # ---------- Optional Quanto runtime patch (FP32-scale support), enable/disable ----------
 _patch_state = SimpleNamespace(enabled=False, orig=None, scale_index=None)
 _fp8_kernel_patch_state = SimpleNamespace(enabled=False, orig_forward=None)
-
 def enable_fp8_fp32_scale_support():
     """
     Version-robust wrapper for WeightQBytesTensor.create:
