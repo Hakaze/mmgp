@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, re, inspect
+import json, re, inspect, os
 from types import SimpleNamespace
 from typing import Dict, Optional, Tuple, Union, Iterable, Callable
 
@@ -28,6 +28,47 @@ _DTYPE_ALIASES = {
     "bfloat16": torch.bfloat16, "bf16": torch.bfloat16,
     "float16": torch.float16, "fp16": torch.float16, "half": torch.float16,
 }
+
+_fp8_weight_debug_map: Dict[int, str] = {}
+
+
+def register_fp8_weight_debug_name(weight: Optional[torch.Tensor], name: str) -> None:
+    if weight is None:
+        return
+    if isinstance(name, str) and name:
+        try:
+            _fp8_weight_debug_map[id(weight)] = name
+        except Exception:
+            pass
+        try:
+            setattr(weight, "_debug_name", name)
+        except Exception:
+            pass
+
+
+def get_fp8_weight_debug_name(weight: Optional[torch.Tensor]) -> str:
+    if weight is None:
+        return "unknown"
+    debug = getattr(weight, "_debug_name", None)
+    if isinstance(debug, str) and debug:
+        return debug
+    try:
+        mapped = _fp8_weight_debug_map.get(id(weight))
+        if isinstance(mapped, str) and mapped:
+            try:
+                setattr(weight, "_debug_name", mapped)
+            except Exception:
+                pass
+            return mapped
+    except Exception:
+        pass
+    if os.environ.get("WAN2GP_FP8_TAG", "").lower() in ("1", "true", "yes", "on"):
+        try:
+            print(f"[WAN2GP][FP8 tag][miss] type={type(weight).__name__} id={id(weight)} device={weight.device}")
+        except Exception:
+            print(f"[WAN2GP][FP8 tag][miss] type={type(weight).__name__} id={id(weight)}")
+    return "unknown"
+
 
 def _is_weight_key(k: str) -> bool:
     return k.endswith(".weight")
@@ -163,6 +204,14 @@ class ConvertResult(Dict[str, object]):
     @property
     def patch_needed(self) -> bool: return self["patch_needed"]                 # type: ignore
 
+def _preferred_fp8_scale_dtype() -> torch.dtype:
+    """
+    Marlin's FP8 kernels expect fp16 scale tensors. Using bf16 led to
+    noticeable drift on Linux, so force fp16 for stability.
+    """
+    return torch.float16
+
+
 def convert_scaled_fp8_to_quanto(
     src: Union[str, Dict[str, torch.Tensor]],
     *,
@@ -185,7 +234,12 @@ def convert_scaled_fp8_to_quanto(
     if default_dtype is not None:
         dtype = default_dtype
     sd_scale_dtype = _normalize_scale_dtype(dtype)
-    patch_needed = (sd_scale_dtype == torch.float32)
+    patch_needed = False
+    if sd_scale_dtype == torch.float32:
+        # Quanto's FP8 kernels expect half-precision scales. Coerce float32
+        # requests to a supported dtype so we don't need to enable the slow
+        # fp32 patch/fallback path.
+        sd_scale_dtype = _preferred_fp8_scale_dtype()
 
     acc, closer = _as_accessor(
         src,
@@ -230,7 +284,7 @@ def convert_scaled_fp8_to_quanto(
             sk = scale_weight_map.get(wk)
             if sk is not None:
                 s_t = acc.get_tensor(sk).to(torch.float32)
-                if in_place: acc.delete(s_t)
+                if in_place: acc.delete(sk)
                 if s_t.numel() == 1:
                     return torch.full((out_ch,), float(s_t.item()), dtype=torch.float32)
                 if s_t.numel() == out_ch:
@@ -563,6 +617,19 @@ def maybe_enable_fp8_marlin_fallback(quantization_map=None):
     if quantization_map is not None and not _quant_map_has_fp8(quantization_map):
         return False
     return enable_fp8_marlin_fallback()
+
+
+def enable_fp8_marlin_workspace_fix():
+    """No-op placeholder (workspace patch removed)."""
+    return False
+
+
+def disable_fp8_marlin_workspace_fix():
+    """No-op placeholder (workspace patch removed)."""
+    return False
+
+
+
 
 # ---------- Tiny CLI (optional) ----------
 def _cli():
