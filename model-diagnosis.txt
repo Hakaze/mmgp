@@ -1,0 +1,84 @@
+============================================================
+TENSOR ANALYSIS
+============================================================
+
+Total tensors: 1895
+
+Dtype distribution:
+  torch.float16: 693 (36.6%)
+    - model.diffusion_model.blocks.0.cross_attn.k.bias [5120]
+    - model.diffusion_model.blocks.0.cross_attn.norm_k.weight [5120]
+    - model.diffusion_model.blocks.0.cross_attn.norm_q.weight [5120]
+  torch.float32: 402 (21.2%)
+    - model.diffusion_model.blocks.0.cross_attn.k.weight_scale [1]
+    - model.diffusion_model.blocks.0.cross_attn.o.weight_scale [1]
+    - model.diffusion_model.blocks.0.cross_attn.q.weight_scale [1]
+  torch.float8_e4m3fn: 400 (21.1%)
+    - model.diffusion_model.blocks.0.cross_attn.k.weight [5120, 5120]
+    - model.diffusion_model.blocks.0.cross_attn.o.weight [5120, 5120]
+    - model.diffusion_model.blocks.0.cross_attn.q.weight [5120, 5120]
+  torch.uint8: 400 (21.1%)
+    - model.diffusion_model.blocks.0.cross_attn.k.comfy_quant [27]
+    - model.diffusion_model.blocks.0.cross_attn.o.comfy_quant [27]
+    - model.diffusion_model.blocks.0.cross_attn.q.comfy_quant [27]
+
+============================================================
+FP8 FORMAT DETECTION
+============================================================
+  Has 'scaled_fp8' sentinel: False
+  Has .scale_weight tensors: False (0 found)
+  Has FP8 weight tensors: True (400 found)
+  Has non-FP8 .weight tensors: True
+
+  ⚠️  MIXED PRECISION DETECTED!
+      This model has both FP8 and non-FP8 weight tensors.
+
+============================================================
+MMGP DETECTION RESULT
+============================================================
+  kind: scaled_fp8
+  quant_format:
+  fp8_format: e4m3fn
+  matched: True
+  hint: comfyui keys
+
+============================================================
+LAYER TYPE ANALYSIS
+============================================================
+
+Non-FP8 tensors by category:
+  bias: 407
+    - model.diffusion_model.blocks.0.cross_attn.k.bias
+    - model.diffusion_model.blocks.0.cross_attn.o.bias
+    - model.diffusion_model.blocks.0.cross_attn.q.bias
+    ... and 404 more
+  normalization: 240
+    - model.diffusion_model.blocks.0.cross_attn.norm_k.weight
+    - model.diffusion_model.blocks.0.cross_attn.norm_q.weight
+    - model.diffusion_model.blocks.0.norm3.bias
+    ... and 237 more
+  other: 441
+    - model.diffusion_model.blocks.0.cross_attn.k.comfy_quant
+    - model.diffusion_model.blocks.0.cross_attn.o.comfy_quant
+    - model.diffusion_model.blocks.0.cross_attn.q.comfy_quant
+    ... and 438 more
+  other_weight: 407
+    - model.diffusion_model.blocks.0.cross_attn.k.weight_scale
+    - model.diffusion_model.blocks.0.cross_attn.o.weight_scale
+    - model.diffusion_model.blocks.0.cross_attn.q.weight_scale
+    ... and 404 more
+    
+============================================================
+RECOMMENDATIONS
+============================================================
+
+  This is a mixed-precision FP8+ model. Potential issues:
+
+  1. Non-FP8 weights may get their dtype changed during loading
+  2. Normalization layers kept in FP16/BF16 for precision may be affected
+  3. The quantization map only covers FP8 layers
+
+  Suggested fixes:
+  - Ensure normalization layers preserve their original dtype
+  - Check if FP8 Marlin fallback is needed on your system
+  - Verify scale tensors are being applied correctly
