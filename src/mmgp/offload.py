@@ -2296,6 +2296,7 @@ class HfHook:
     def detach_hook(self, module):
         return module
     
+@torch.compiler.disable()
 def _mm_lora_linear_forward(module, *args, **kwargs):
     loras_data = getattr(module, "_mm_lora_data", None)
     if not loras_data:
@@ -2311,6 +2312,7 @@ def _mm_lora_linear_forward(module, *args, **kwargs):
     )
 
 
+@torch.compiler.disable()
 def _mm_lora_generic_forward(module, *args, **kwargs):
     loras_data = getattr(module, "_mm_lora_data", None)
     if not loras_data:
@@ -2806,6 +2808,7 @@ class offload:
 
     @torch.compiler.disable()
     def _lora_linear_forward(self, model, submodule, loras_data, x: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+        torch._dynamo.graph_break()
         weight = submodule.weight
         bias = submodule.bias
         active_adapters = model._loras_active_adapters
